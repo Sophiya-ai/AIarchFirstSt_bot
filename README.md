@@ -25,7 +25,7 @@ AIarchFirstSt_bot/
             ├── requirements.txt     # зависимости
             ├── config.py            # загрузка настроек
             ├── main.py              # точка входа, запуск бота
-            ├── handlersTG.py          # обработка сообщений Telegram
+            ├── handlersTG.py        # обработка сообщений Telegram
             ├── utils.py             # вспомогательные функции (скачивание, кодирование)
             └── services/
                 ├── stt.py           # распознавание речи (Groq)
