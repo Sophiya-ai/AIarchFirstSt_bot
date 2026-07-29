@@ -19,9 +19,7 @@ from handlersTG import (
     start_command,         # Для команды /start
     handle_voice,          # Для голосовых сообщений
     handle_photo,          # Для фото
-    KEY_VOICE_PATH,        # Ключи для хранения в контексте
-    KEY_PHOTO_PATH,
-    run_analysis            # Функция запуска полного анализа
+    combined_handler
 )
 import utils               # Вспомогательные функции (скачивание файлов)
 from logger import setup_logger, LOGGER_NAME   # Импортируем настройки логгера
@@ -29,42 +27,6 @@ from logger import setup_logger, LOGGER_NAME   # Импортируем наст
 
 # Получаем логгер для этого модуля
 logger = logging.getLogger(LOGGER_NAME)
-
-async def combined_handler(update, context):
-    """
-    Обработчик на случай, если пользователь отправил одним сообщением
-    сразу и голосовое, и фотографию.
-    Мы вручную сохраняем оба файла и, если всё готово, запускаем анализ.
-    """
-    logger.debug("Вызван combined_handler (голос + фото в одном сообщении)")
-    message = update.message
-    voice = message.voice
-    photo = message.photo
-
-    # Если в сообщении есть голосовое — скачиваем и запоминаем путь
-    if voice:
-        voice_file = await voice.get_file()
-        voice_path = utils.download_file(context.bot, voice_file.file_id, "voice.ogg")
-        context.user_data[KEY_VOICE_PATH] = voice_path
-        logger.info(f"Голосовое сохранено в combined: {voice_path}")
-
-    # Если есть фото — скачиваем и запоминаем (наибольшее разрешение)
-    if photo:
-        photo_file = await photo[-1].get_file()
-        photo_path = utils.download_file(context.bot, photo_file.file_id, "schema.jpg")
-        context.user_data[KEY_PHOTO_PATH] = photo_path
-        logger.info(f"Фото сохранено в combined: {photo_path}")
-
-    # Проверяем, всё ли получено (могло быть, что голос/фото не загрузились)
-    if context.user_data.get(KEY_VOICE_PATH) and context.user_data.get(KEY_PHOTO_PATH):
-        # Запускаем обработку, передавая пути к обоим файлам
-        await run_analysis(update, context,
-                           context.user_data[KEY_VOICE_PATH],
-                           context.user_data[KEY_PHOTO_PATH])
-    else:
-        # Что-то пошло не так — просим прислать недостающее
-        logger.warning("combined_handler: не все файлы получены")
-        await message.reply_text("Пожалуйста, убедитесь, что вы отправили и голосовое, и фото.")
 
 
 def main():

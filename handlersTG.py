@@ -61,12 +61,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.debug(f"Пользователь {user.id} прислал голосовое")
 
-    # Скачиваем голосовой файл во временную папку.
-    # get_file() возвращает объект, через который можно загрузить файл с сервера Telegram.
-    voice_file = await voice.get_file()
-
-    # utils.download_file скачивает файл и возвращает путь к нему на диске.
-    voice_path = utils.download_file(context.bot, voice_file.file_id, "voice.ogg")
+    # Асинхронно скачиваем файл, используя его file_id
+    voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
     logger.info(f"Голосовое сохранено: {voice_path}")
 
     # Сохраняем путь к файлу в «памяти» бота для этого конкретного пользователя.
@@ -99,10 +95,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.debug(f"Пользователь {user.id} прислал фото")
 
-    # Из массива photo берём последний элемент — фото с самым высоким разрешением.
+    # Используем file_id самого большого размера (последний в списке).
     # Telegram всегда отправляет массив, в котором photo[-1] — наибольшее.
-    photo_file = await photo[-1].get_file()
-    photo_path = utils.download_file(context.bot, photo_file.file_id, "schema.jpg")
+    photo_path = await utils.download_file(context.bot, photo[-1].file_id, "schema.jpg")
     logger.info(f"Фото сохранено: {photo_path}")
 
     # Сохраняем путь к фотографии в контексте пользователя
@@ -118,6 +113,41 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Просим прислать голос
         logger.debug("Голоса ещё нет, запрашиваем")
         await message.reply_text("📷 Фото сохранено. Теперь пришлите, пожалуйста, голосовое описание задачи.")
+
+
+async def combined_handler(update, context):
+    """
+    Обработчик на случай, если пользователь отправил одним сообщением
+    сразу и голосовое, и фотографию.
+    Мы вручную сохраняем оба файла и, если всё готово, запускаем анализ.
+    """
+    logger.debug("Вызван combined_handler (голос + фото в одном сообщении)")
+    message = update.message
+    voice = message.voice
+    photo = message.photo
+
+    # Если в сообщении есть голосовое — скачиваем и запоминаем путь
+    if voice:
+        voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
+        context.user_data[KEY_VOICE_PATH] = voice_path
+        logger.info(f"Голосовое сохранено в combined: {voice_path}")
+
+    # Если есть фото — скачиваем и запоминаем (наибольшее разрешение)
+    if photo:
+        photo_path = await utils.download_file(context.bot, photo[-1].file_id, "schema.jpg")
+        context.user_data[KEY_PHOTO_PATH] = photo_path
+        logger.info(f"Фото сохранено в combined: {photo_path}")
+
+    # Проверяем, всё ли получено (могло быть, что голос/фото не загрузились)
+    if context.user_data.get(KEY_VOICE_PATH) and context.user_data.get(KEY_PHOTO_PATH):
+        # Запускаем обработку, передавая пути к обоим файлам
+        await run_analysis(update, context,
+                           context.user_data[KEY_VOICE_PATH],
+                           context.user_data[KEY_PHOTO_PATH])
+    else:
+        # Что-то пошло не так — просим прислать недостающее
+        logger.warning("combined_handler: не все файлы получены")
+        await message.reply_text("Пожалуйста, убедитесь, что вы отправили и голосовое, и фото.")
 
 
 async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,

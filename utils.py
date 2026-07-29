@@ -14,20 +14,20 @@ def ensure_temp_dir():
     logger.debug(f"Создана/найдена временная папка: {TEMP_DIR}")
 
 
-def download_file(bot, file_id, file_name):
-    """
-        Скачиваем файл из Telegram по его file_id и сохраняем во временную папку.
-        - bot — объект бота (через него получаем информацию о файле)
-        - file_id — уникальный идентификатор файла в Telegram
-        - file_name — под каким именем сохранить файл на диске
-        Возвращаем полный путь к сохранённому файлу.
-    """
-    ensure_temp_dir()
-    file = bot.get_file(file_id)                    # получаем объект файла
-    file_path = os.path.join(TEMP_DIR, file_name)   # формируем полный путь
-    file.download(file_path)
-    logger.debug(f"Файл {file_name} сохранён: {file_path}")
-    return file_path
+async def download_file(bot, file_id, file_name):
+        """
+            Асинхронно скачиваем файл из Telegram по его file_id и сохраняем во временную папку.
+            - bot — объект бота (через него получаем информацию о файле)
+            - file_id — уникальный идентификатор файла в Telegram
+            - file_name — под каким именем сохранить файл на диске
+            Возвращаем полный путь к сохранённому файлу.
+        """
+        ensure_temp_dir()
+        file = await bot.get_file(file_id)                    # Асинхронно получаем объект File через API Telegram
+        file_path = os.path.join(TEMP_DIR, file_name)   # формируем полный путь
+        await file.download_to_drive(file_path)                # Асинхронно скачиваем файл на диск
+        logger.debug(f"Файл {file_name} сохранён: {file_path}")
+        return file_path
 
 
 
