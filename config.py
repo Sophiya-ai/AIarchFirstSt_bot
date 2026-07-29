@@ -9,7 +9,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Модели
 STT_MODEL = "whisper-large-v3"         # модель распознавания речи от Groq
-LLM_MODEL = "google/gemini-flash-1.5"   # на OpenRouter
+LLM_MODEL = "google/gemma-4-31b-it:free"   # на OpenRouter
 IMAGE_GEN_URL = "https://image.pollinations.ai/prompt/" # Базовый URL для бесплатного генератора изображений
 
 # Папка для временных файлов

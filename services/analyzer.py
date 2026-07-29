@@ -41,6 +41,7 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
             ]}
         ],
+        extra_body={"reasoning": {"enabled": True}},
         temperature=0.2, # низкая температура — ответ более предсказуемый и точный
         max_tokens=2000  # ограничиваем длину ответа
     )
