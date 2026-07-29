@@ -10,7 +10,8 @@ from telegram.ext import (
     ApplicationBuilder,   # Строитель приложения (основной объект бота)
     CommandHandler,        # Обработчик команд типа /start
     MessageHandler,        # Обработчик обычных сообщений
-    filters                # Фильтры для отбора определённых типов сообщений
+    filters,                # Фильтры для отбора определённых типов сообщений
+    CallbackContext
 )
 from config import TELEGRAM_TOKEN  # Токен бота из файла .env
 
@@ -29,6 +30,20 @@ from logger import setup_logger, LOGGER_NAME   # Импортируем наст
 logger = logging.getLogger(LOGGER_NAME)
 
 
+async def error_handler(update: object, context: CallbackContext) -> None:
+    """
+    Глобальный обработчик ошибок.
+    Логирует любое необработанное исключение и, если возможно,
+    отправляет сообщение пользователю.
+    """
+    logger.exception("Необработанное исключение при обработке обновления:")
+    # Пытаемся извлечь сообщение, чтобы уведомить пользователя
+    if update and hasattr(update, 'effective_message') and update.effective_message:
+        await update.effective_message.reply_text(
+            "⚠️ Внутренняя ошибка бота. Попробуйте позже или перезапустите сеанс командой /start."
+        )
+
+
 def main():
     """
     Собирает и запускает Telegram-бота.
@@ -41,6 +56,9 @@ def main():
     # Создаём экземпляр приложения и передаём токен.
     # ApplicationBuilder собирает все настройки и создаёт готовое приложение.
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    # Регистрируем глобальный обработчик ошибок
+    app.add_error_handler(error_handler)
 
     # Регистрируем обработчик команды /start
     app.add_handler(CommandHandler("start", start_command))

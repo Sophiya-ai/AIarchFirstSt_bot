@@ -52,32 +52,37 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Сохраняет аудиофайл, проверяет, есть ли уже фото.
     Если фото уже получено — запускает анализ. Если нет — просит прислать фото.
     """
-    message = update.message         # Извлекаем объект сообщения
-    voice = message.voice            # Получаем информацию о голосовом файле
-    if not voice:
-        logger.warning("handle_voice: сообщение без голосового")
-        return                       # Если по какой-то причине голоса нет — выходим
+    try:
+        message = update.message         # Извлекаем объект сообщения
+        voice = message.voice            # Получаем информацию о голосовом файле
+        if not voice:
+            logger.warning("handle_voice: сообщение без голосового")
+            return                       # Если по какой-то причине голоса нет — выходим
 
-    user = update.effective_user
-    logger.debug(f"Пользователь {user.id} прислал голосовое")
+        user = update.effective_user
+        logger.debug(f"Пользователь {user.id} прислал голосовое")
 
-    # Асинхронно скачиваем файл, используя его file_id
-    voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
-    logger.info(f"Голосовое сохранено: {voice_path}")
+        # Асинхронно скачиваем файл, используя его file_id
+        voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
+        logger.info(f"Голосовое сохранено: {voice_path}")
 
-    # Сохраняем путь к файлу в «памяти» бота для этого конкретного пользователя.
-    context.user_data[KEY_VOICE_PATH] = voice_path
+        # Сохраняем путь к файлу в «памяти» бота для этого конкретного пользователя.
+        context.user_data[KEY_VOICE_PATH] = voice_path
 
-    # Проверяем, есть ли уже путь к фотографии
-    photo_path = context.user_data.get(KEY_PHOTO_PATH)
-    if photo_path:
-        logger.info("Оба файла готовы (голос только что получен), запуск анализа")
-        # Если фото уже было прислано ранее — всё готово, запускаем анализ
-        await run_analysis(update, context, voice_path, photo_path)
-    else:
-        # Иначе просим пользователя дослать фото
-        logger.debug("Фото ещё нет, запрашиваем")
-        await message.reply_text("🎤 Голосовое сохранено. Теперь пришлите, пожалуйста, фото схемы.")
+        # Проверяем, есть ли уже путь к фотографии
+        photo_path = context.user_data.get(KEY_PHOTO_PATH)
+        if photo_path:
+            logger.info("Оба файла готовы (голос только что получен), запуск анализа")
+            # Если фото уже было прислано ранее — всё готово, запускаем анализ
+            await run_analysis(update, context, voice_path, photo_path)
+        else:
+            # Иначе просим пользователя дослать фото
+            logger.debug("Фото ещё нет, запрашиваем")
+            await message.reply_text("🎤 Голосовое сохранено. Теперь пришлите, пожалуйста, фото схемы.")
+
+    except Exception as e:
+            logger.exception(f"Ошибка в handle_voice: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке голосового сообщения. Попробуйте снова или обратитесь к администратору.")
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -86,33 +91,37 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Сохраняет изображение, проверяет, есть ли уже голос.
     Если голос уже получен — запускает анализ. Иначе просит записать голосовое.
     """
-    message = update.message
-    photo = message.photo
-    if not photo:
-        logger.warning("handle_photo: сообщение без фото")
-        return
+    try:
+        message = update.message
+        photo = message.photo
+        if not photo:
+            logger.warning("handle_photo: сообщение без фото")
+            return
 
-    user = update.effective_user
-    logger.debug(f"Пользователь {user.id} прислал фото")
+        user = update.effective_user
+        logger.debug(f"Пользователь {user.id} прислал фото")
 
-    # Используем file_id самого большого размера (последний в списке).
-    # Telegram всегда отправляет массив, в котором photo[-1] — наибольшее.
-    photo_path = await utils.download_file(context.bot, photo[-1].file_id, "schema.jpg")
-    logger.info(f"Фото сохранено: {photo_path}")
+        # Используем file_id самого большого размера (последний в списке).
+        # Telegram всегда отправляет массив, в котором photo[-1] — наибольшее.
+        photo_path = await utils.download_file(context.bot, photo[-1].file_id, "schema.jpg")
+        logger.info(f"Фото сохранено: {photo_path}")
 
-    # Сохраняем путь к фотографии в контексте пользователя
-    context.user_data[KEY_PHOTO_PATH] = photo_path
+        # Сохраняем путь к фотографии в контексте пользователя
+        context.user_data[KEY_PHOTO_PATH] = photo_path
 
-    # Проверяем наличие голосового
-    voice_path = context.user_data.get(KEY_VOICE_PATH)
-    if voice_path:
-        # Оба компонента на месте — запускаем анализ
-        logger.info("Оба файла готовы (фото только что получено), запуск анализа")
-        await run_analysis(update, context, voice_path, photo_path)
-    else:
-        # Просим прислать голос
-        logger.debug("Голоса ещё нет, запрашиваем")
-        await message.reply_text("📷 Фото сохранено. Теперь пришлите, пожалуйста, голосовое описание задачи.")
+        # Проверяем наличие голосового
+        voice_path = context.user_data.get(KEY_VOICE_PATH)
+        if voice_path:
+            # Оба компонента на месте — запускаем анализ
+            logger.info("Оба файла готовы (фото только что получено), запуск анализа")
+            await run_analysis(update, context, voice_path, photo_path)
+        else:
+            # Просим прислать голос
+            logger.debug("Голоса ещё нет, запрашиваем")
+            await message.reply_text("📷 Фото сохранено. Теперь пришлите, пожалуйста, голосовое описание задачи.")
+    except Exception as e:
+            logger.exception(f"Ошибка в handle_photo: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке фото. Попробуйте снова или обратитесь к администратору.")
 
 
 async def combined_handler(update, context):
