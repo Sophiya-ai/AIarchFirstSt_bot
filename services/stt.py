@@ -1,9 +1,13 @@
 """
 Модуль для распознавания речи (Speech-to-Text, STT) через Groq API.
 """
-
+import logging
 from groq import Groq
 from config import GROQ_API_KEY, STT_MODEL
+from logger import LOGGER_NAME
+
+
+logger = logging.getLogger(LOGGER_NAME)
 
 # Создаём клиент Groq и передаём ему ключ доступа
 client = Groq(api_key=GROQ_API_KEY)
@@ -15,17 +19,23 @@ def transcribe_audio(file_path: str) -> str:
     Гарантирует, что на выходе всегда будет строка, даже если библиотека
     вернёт объект Transcription.
     """
-    with open(file_path, "rb") as audio:
-        result = client.audio.transcriptions.create(
-            model=STT_MODEL,
-            file=(file_path, audio.read()),   # передаём файл (имя, байты)
-            language="ru",
-            response_format="text"          # API возвращает просто текст, но типы могут «думать» иначе
-        )
+    logger.debug(f"Отправка аудио на транскрибацию: {file_path}")
+    try:
+        with open(file_path, "rb") as audio:
+            result = client.audio.transcriptions.create(
+                model=STT_MODEL,
+                file=(file_path, audio.read()),   # передаём файл (имя, байты)
+                language="ru",
+                response_format="text"          # API возвращает просто текст, но типы могут «думать» иначе
+            )
 
-    # Обработка типа результата:
-    # — если уже строка (что верно для response_format="text"), используем её;
-    # — если по какой-то причине объект (например, при обновлении SDK), берём поле .text.
-    if isinstance(result, str):
-        return result
-    return result.text
+        # Обработка типа результата:
+        # — если уже строка (что верно для response_format="text"), используем её;
+        # — если по какой-то причине объект (например, при обновлении SDK), берём поле .text.
+        # Обрабатываем возможный объект Transcription
+        text = result if isinstance(result, str) else result.text
+        logger.info(f"Транскрибация завершена, длина текста: {len(text)} символов")
+        return text
+    except Exception as e:
+        logger.exception("Ошибка при обращении к Groq API")
+        raise

@@ -4,6 +4,7 @@
 можно отправлять голос и фото по отдельности, в любом порядке.
 Если пользователь случайно отправляет оба сразу — корректно обработаем и такой случай.
 """
+import logging
 # Импортируем нужные классы для создания бота и обработчиков
 from telegram.ext import (
     ApplicationBuilder,   # Строитель приложения (основной объект бота)
@@ -23,7 +24,11 @@ from handlersTG import (
     run_analysis            # Функция запуска полного анализа
 )
 import utils               # Вспомогательные функции (скачивание файлов)
+from logger import setup_logger, LOGGER_NAME   # Импортируем настройки логгера
 
+
+# Получаем логгер для этого модуля
+logger = logging.getLogger(LOGGER_NAME)
 
 async def combined_handler(update, context):
     """
@@ -31,6 +36,7 @@ async def combined_handler(update, context):
     сразу и голосовое, и фотографию.
     Мы вручную сохраняем оба файла и, если всё готово, запускаем анализ.
     """
+    logger.debug("Вызван combined_handler (голос + фото в одном сообщении)")
     message = update.message
     voice = message.voice
     photo = message.photo
@@ -40,12 +46,14 @@ async def combined_handler(update, context):
         voice_file = await voice.get_file()
         voice_path = utils.download_file(context.bot, voice_file.file_id, "voice.ogg")
         context.user_data[KEY_VOICE_PATH] = voice_path
+        logger.info(f"Голосовое сохранено в combined: {voice_path}")
 
     # Если есть фото — скачиваем и запоминаем (наибольшее разрешение)
     if photo:
         photo_file = await photo[-1].get_file()
         photo_path = utils.download_file(context.bot, photo_file.file_id, "schema.jpg")
         context.user_data[KEY_PHOTO_PATH] = photo_path
+        logger.info(f"Фото сохранено в combined: {photo_path}")
 
     # Проверяем, всё ли получено (могло быть, что голос/фото не загрузились)
     if context.user_data.get(KEY_VOICE_PATH) and context.user_data.get(KEY_PHOTO_PATH):
@@ -55,6 +63,7 @@ async def combined_handler(update, context):
                            context.user_data[KEY_PHOTO_PATH])
     else:
         # Что-то пошло не так — просим прислать недостающее
+        logger.warning("combined_handler: не все файлы получены")
         await message.reply_text("Пожалуйста, убедитесь, что вы отправили и голосовое, и фото.")
 
 
@@ -62,6 +71,11 @@ def main():
     """
     Собирает и запускает Telegram-бота.
     """
+
+    # Настраиваем логирование
+    setup_logger()
+    logger.info("Запуск бота...")
+
     # Создаём экземпляр приложения и передаём токен.
     # ApplicationBuilder собирает все настройки и создаёт готовое приложение.
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -70,7 +84,7 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
 
     # Обработчик для сообщений, содержащих ТОЛЬКО голосовое (без фото).
-    # Фильтр: filters.VOICE & ~filters.PHOTO  означает "есть голос И НЕТ фото".
+    # Фильтр: filters.VOICE & ~filters.PHOTO означает "есть голос И НЕТ фото".
     app.add_handler(MessageHandler(filters.VOICE & ~filters.PHOTO, handle_voice))
 
     # Обработчик для сообщений, содержащих ТОЛЬКО фото (без голоса).
@@ -80,6 +94,7 @@ def main():
     # Такой фильтр сработает только когда присутствуют оба типа.
     app.add_handler(MessageHandler(filters.VOICE & filters.PHOTO, combined_handler))
 
+    logger.info("Бот запущен и готов к работе.")
     # Печатаем сообщение в консоль, чтобы видеть, что бот стартовал
     print("Бот запущен в диалоговом режиме...")
 

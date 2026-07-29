@@ -1,17 +1,23 @@
 """
-Модуль для генерации изображения архитектурной диаграммы.
+Модуль для генерации диаграммы архитектуры.
 Использует бесплатный сервис Pollinations.ai без ключа.
 """
-
+import logging
 import requests
 from config import IMAGE_GEN_URL
+from logger import LOGGER_NAME
+
+logger = logging.getLogger(LOGGER_NAME)
 
 def generate_architecture_image(prompt: str) -> bytes:
     """
     Принимает описание на английском языке (промпт).
     Отправляет запрос к Pollinations.ai и возвращает байты готовой картинки.
     """
+    logger.debug(f"Запрос к Pollinations.ai с промптом: {prompt[:80]}...")
+
     if not prompt:
+        logger.warning("Пустой промпт для генерации")
         raise ValueError("Пустое описание для генерации.")  # без промпта нет смысла
 
     # URL-кодируем текст, чтобы его можно было вставить в URL
@@ -22,9 +28,14 @@ def generate_architecture_image(prompt: str) -> bytes:
     # model=flux — модель, которая лучше рисует схемы и текст
     # nologo=true — убирает водяной знак Pollinations (если есть)
     url = f"{IMAGE_GEN_URL}{encoded_prompt}?model=flux&nologo=true"
+    logger.debug(f"URL генерации: {url}")
 
-    # Выполняем GET-запрос и сразу получаем бинарные данные картинки
-    response = requests.get(url, timeout=30)  # 30 секунд — максимальное время ожидания
-    response.raise_for_status()              # если сервер вернул ошибку (4xx,5xx), вылетит исключение
-
-    return response.content  # возвращаем байты изображения
+    try:
+        # Выполняем GET-запрос и сразу получаем бинарные данные картинки
+        response = requests.get(url, timeout=30)  # 30 секунд — максимальное время ожидания
+        response.raise_for_status()              # если сервер вернул ошибку (4xx,5xx), вылетит исключение
+        logger.info(f"Изображение успешно загружено, размер: {len(response.content)} байт")
+        return response.content  # возвращаем байты изображения
+    except requests.exceptions.RequestException as e:
+        logger.exception(f"Ошибка при обращении к Pollinations.ai: {str(e)}")
+        raise
