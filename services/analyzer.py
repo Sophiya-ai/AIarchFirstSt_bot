@@ -63,7 +63,7 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
             logger.info(f"Ответ от OpenRouter получен, длина: {len(full_response)} символов")
 
             # Теперь отделим текст отчёта от описания картинки.
-            # В ответе есть специальная секция «Описание архитектурной диаграммы...».
+            # В ответе есть специальная секция «Описание диаграммы архитектуры...».
             # Мы вырежем её, чтобы не показывать пользователю, а использовать отдельно.
             lines = full_response.split("\n")
             text_report = []
@@ -77,9 +77,12 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
                     diagram_desc += line.strip() + " " # собираем все строки описания в одну
                 else:
                     text_report.append(line)
+
             # Убираем возможные остатки маркера из текста (если он оказался не на отдельной строке)
             report = "\n".join(text_report).replace("**Описание диаграммы архитектуры для генерации изображения:**", "").strip()
+            diagram_desc = diagram_desc.strip()
             logger.debug(f"Извлечено описание диаграммы: {diagram_desc[:80]}...")
+
             return {
                 "report": report,                           # чистый текст для пользователя
                 "diagram_prompt": diagram_desc.strip()      # промпт для генератора картинок

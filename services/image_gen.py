@@ -20,14 +20,17 @@ def generate_architecture_image(prompt: str) -> bytes:
         logger.warning("Пустой промпт для генерации")
         raise ValueError("Пустое описание для генерации.")  # без промпта нет смысла
 
+    # Усиливаем промпт ключевыми словами для технической диаграммы
+    enhanced_prompt = f"Clean professional diagram: {prompt}. Vector style, white background, thin black outlines, no colors, no shadows, simple sans-serif font."
+
     # URL-кодируем текст, чтобы его можно было вставить в URL
     # (например, пробелы превращаются в %20)
-    encoded_prompt = requests.utils.quote(prompt)
+    encoded_prompt = requests.utils.quote(enhanced_prompt)
 
     # Параметры: flux-модель, фиксированный seed для одинакового качества,
     # размер 1024x768 (как слайд), без логотипа
     params = {
-        "model": "flux",
+        "model": "turbo",
         "width": 1024,
         "height": 768,
         "seed": 12345,  # любое число, чтобы стиль был стабильным
