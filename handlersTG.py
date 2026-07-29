@@ -46,43 +46,51 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Вызывается, когда пользователь присылает голосовое сообщение (без фото).
+    Вызывается, когда пользователь присылает голосовое/аудио любого типа -
+    voice, audio, аудиодокумент (без фото).
     Сохраняет аудиофайл, проверяет, есть ли уже фото.
     Если фото уже получено — запускает анализ. Если нет — просит прислать фото.
     """
     try:
         message = update.message         # Извлекаем объект сообщения
-        voice = message.voice            # Получаем информацию о голосовом файле
-        if not voice:
-            logger.warning("handle_voice: сообщение без голосового")
-            return                       # Если по какой-то причине голоса нет — выходим
+        # Определяем file_id в зависимости от того, что пришло
+        file_id = None
+        if message.voice:
+            file_id = message.voice.file_id
+        elif message.audio:
+            file_id = message.audio.file_id
+        elif message.document and message.document.mime_type and "audio" in message.document.mime_type:
+            file_id = message.document.file_id
+        else:
+            logger.warning("handle_audio: нет аудиоданных")
+            return
 
         user = update.effective_user
-        logger.debug(f"Пользователь {user.id} прислал голосовое")
+        logger.info(f"Пользователь {user.id} прислал аудио (тип: {type(message).__name__})")
 
         # Асинхронно скачиваем файл, используя его file_id
-        voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
-        logger.info(f"Голосовое сохранено: {voice_path}")
+        audio_path = await utils.download_file(context.bot, file_id, "voice.ogg")
+        logger.info(f"Аудио сохранено: {audio_path}")
 
         # Сохраняем путь к файлу в «памяти» бота для этого конкретного пользователя.
-        context.user_data[KEY_VOICE_PATH] = voice_path
+        context.user_data[KEY_VOICE_PATH] = audio_path
 
         # Проверяем, есть ли уже путь к фотографии
         photo_path = context.user_data.get(KEY_PHOTO_PATH)
         if photo_path:
             logger.info("Оба файла готовы (голос только что получен), запуск анализа")
             # Если фото уже было прислано ранее — всё готово, запускаем анализ
-            await run_analysis(update, context, voice_path, photo_path)
+            await run_analysis(update, context, audio_path, photo_path)
         else:
             # Иначе просим пользователя дослать фото
             logger.debug("Фото ещё нет, запрашиваем")
-            await message.reply_text("🎤 Голосовое сохранено. Теперь пришлите, пожалуйста, фото схемы.")
+            await message.reply_text("🎤 Аудио сохранено. Теперь пришлите, пожалуйста, фото схемы.")
 
     except Exception as e:
-            logger.exception(f"Ошибка в handle_voice: {e}")
-            await update.message.reply_text("Произошла ошибка при обработке голосового сообщения. Попробуйте снова или обратитесь к администратору.")
+            logger.exception(f"Ошибка в handle_audio: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке аудио. Попробуйте снова или обратитесь к администратору.")
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -130,33 +138,38 @@ async def combined_handler(update, context):
     сразу и голосовое, и фотографию.
     Мы вручную сохраняем оба файла и, если всё готово, запускаем анализ.
     """
-    logger.debug("Вызван combined_handler (голос + фото в одном сообщении)")
-    message = update.message
-    voice = message.voice
-    photo = message.photo
+    try:
+        logger.debug("Вызван combined_handler (голос + фото в одном сообщении)")
+        message = update.message
 
-    # Если в сообщении есть голосовое — скачиваем и запоминаем путь
-    if voice:
-        voice_path = await utils.download_file(context.bot, voice.file_id, "voice.ogg")
-        context.user_data[KEY_VOICE_PATH] = voice_path
-        logger.info(f"Голосовое сохранено в combined: {voice_path}")
+        # Определяем аудио file_id
+        file_id = None
+        if message.voice:
+            file_id = message.voice.file_id
+        elif message.audio:
+            file_id = message.audio.file_id
+        elif message.document and message.document.mime_type and "audio" in message.document.mime_type:
+            file_id = message.document.file_id
 
-    # Если есть фото — скачиваем и запоминаем (наибольшее разрешение)
-    if photo:
-        photo_path = await utils.download_file(context.bot, photo[-1].file_id, "schema.jpg")
-        context.user_data[KEY_PHOTO_PATH] = photo_path
-        logger.info(f"Фото сохранено в combined: {photo_path}")
+        if file_id:
+            audio_path = await utils.download_file(context.bot, file_id, "voice.ogg")
+            context.user_data[KEY_VOICE_PATH] = audio_path
+            logger.info(f"Аудио сохранено в combined: {audio_path}")
 
-    # Проверяем, всё ли получено (могло быть, что голос/фото не загрузились)
-    if context.user_data.get(KEY_VOICE_PATH) and context.user_data.get(KEY_PHOTO_PATH):
-        # Запускаем обработку, передавая пути к обоим файлам
-        await run_analysis(update, context,
-                           context.user_data[KEY_VOICE_PATH],
-                           context.user_data[KEY_PHOTO_PATH])
-    else:
-        # Что-то пошло не так — просим прислать недостающее
-        logger.warning("combined_handler: не все файлы получены")
-        await message.reply_text("Пожалуйста, убедитесь, что вы отправили и голосовое, и фото.")
+        if message.photo:
+            photo_path = await utils.download_file(context.bot, message.photo[-1].file_id, "schema.jpg")
+            context.user_data[KEY_PHOTO_PATH] = photo_path
+            logger.info(f"Фото сохранено в combined: {photo_path}")
+
+        if context.user_data.get(KEY_VOICE_PATH) and context.user_data.get(KEY_PHOTO_PATH):
+            await run_analysis(update, context,
+                               context.user_data[KEY_VOICE_PATH],
+                               context.user_data[KEY_PHOTO_PATH])
+        else:
+            await message.reply_text("Пожалуйста, убедитесь, что вы отправили и аудио, и фото.")
+    except Exception as e:
+        logger.exception(f"Ошибка в combined_handler: {e}")
+
 
 
 async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,

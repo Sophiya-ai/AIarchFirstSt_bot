@@ -3,6 +3,7 @@
 Использует OpenRouter для вызова модели Gemini Flash,
 которая умеет читать картинки и текст одновременно.
 """
+import time
 import logging
 from openai import OpenAI
 from config import OPENROUTER_API_KEY, LLM_MODEL, SYSTEM_PROMPT

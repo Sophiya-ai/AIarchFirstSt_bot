@@ -4,6 +4,7 @@
 можно отправлять голос и фото по отдельности, в любом порядке.
 Если пользователь случайно отправляет оба сразу — корректно обработаем и такой случай.
 """
+import json
 import logging
 # Импортируем нужные классы для создания бота и обработчиков
 from telegram.ext import (
@@ -18,7 +19,7 @@ from config import TELEGRAM_TOKEN  # Токен бота из файла .env
 # Импортируем наши функции-обработчики из модуля handlers
 from handlersTG import (
     start_command,         # Для команды /start
-    handle_voice,          # Для голосовых сообщений
+    handle_audio,          # Для голосовых сообщений
     handle_photo,          # Для фото
     combined_handler
 )
@@ -51,6 +52,7 @@ def main():
 
     # Настраиваем логирование
     setup_logger()
+
     logger.info("Запуск бота...")
 
     # Создаём экземпляр приложения и передаём токен.
@@ -65,14 +67,48 @@ def main():
 
     # Обработчик для сообщений, содержащих ТОЛЬКО голосовое (без фото).
     # Фильтр: filters.VOICE & ~filters.PHOTO означает "есть голос И НЕТ фото".
-    app.add_handler(MessageHandler(filters.VOICE & ~filters.PHOTO, handle_voice))
+    app.add_handler(MessageHandler(
+        (filters.VOICE | filters.AUDIO | filters.Document.AUDIO) & ~filters.PHOTO,
+        handle_audio
+    ))
 
     # Обработчик для сообщений, содержащих ТОЛЬКО фото (без голоса).
-    app.add_handler(MessageHandler(filters.PHOTO & ~filters.VOICE, handle_photo))
+    app.add_handler(MessageHandler(
+        filters.PHOTO & ~(filters.VOICE | filters.AUDIO | filters.Document.AUDIO),
+        handle_photo))
 
     # Обработчик на случай, если в одном сообщении есть и голос, и фото одновременно.
     # Такой фильтр сработает только когда присутствуют оба типа.
-    app.add_handler(MessageHandler(filters.VOICE & filters.PHOTO, combined_handler))
+    app.add_handler(MessageHandler(
+        (filters.VOICE | filters.AUDIO | filters.Document.AUDIO) & filters.PHOTO,
+        combined_handler
+    ))
+
+
+    # === ДИАГНОСТИКА: ловим все сообщения, чтобы понять их тип ===
+    async def debug_all_messages(update, context):
+        msg = update.message
+        logger.info(f"ОТЛАДКА: получено сообщение типа: {type(msg).__name__}")
+        # Выведем основные атрибуты в лог
+        debug_info = {
+            "message_id": msg.message_id,
+            "from_user": msg.from_user.id if msg.from_user else None,
+            "date": msg.date,
+            "voice": msg.voice is not None,
+            "audio": msg.audio is not None,
+            "document": msg.document is not None,
+            "photo": msg.photo is not None,
+            "text": msg.text if msg.text else None,
+        }
+        logger.info(f"ОТЛАДКА: детали сообщения: {json.dumps(debug_info, default=str)}")
+        # Если есть voice или audio, дополнительно выведем их параметры
+        if msg.voice:
+            logger.info(f"ОТЛАДКА: voice duration={msg.voice.duration}, mime={msg.voice.mime_type}, file_id={msg.voice.file_id[:20]}...")
+        if msg.audio:
+            logger.info(f"ОТЛАДКА: audio duration={msg.audio.duration}, mime={msg.audio.mime_type}, file_id={msg.audio.file_id[:20]}...")
+    app.add_handler(MessageHandler(~filters.COMMAND, debug_all_messages))
+    # === КОНЕЦ ДИАГНОСТИКИ ===
+
 
     logger.info("Бот запущен и готов к работе.")
     # Печатаем сообщение в консоль, чтобы видеть, что бот стартовал
