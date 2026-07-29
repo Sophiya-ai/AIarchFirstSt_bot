@@ -57,7 +57,13 @@ def main():
 
     # Создаём экземпляр приложения и передаём токен.
     # ApplicationBuilder собирает все настройки и создаёт готовое приложение.
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    # Методы connect_timeout, read_timeout, write_timeout дадут
+    #      Telegram больше времени на передачу данных через медленный VPN.
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN) \
+    .connect_timeout(30) \
+    .read_timeout(30) \
+    .write_timeout(30) \
+    .build()
 
     # Регистрируем глобальный обработчик ошибок
     app.add_error_handler(error_handler)

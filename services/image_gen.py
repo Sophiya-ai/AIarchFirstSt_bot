@@ -24,15 +24,28 @@ def generate_architecture_image(prompt: str) -> bytes:
     # (например, пробелы превращаются в %20)
     encoded_prompt = requests.utils.quote(prompt)
 
+    # Параметры: flux-модель, фиксированный seed для одинакового качества,
+    # размер 1024x768 (как слайд), без логотипа
+    params = {
+        "model": "flux",
+        "width": 1024,
+        "height": 768,
+        "seed": 12345,  # любое число, чтобы стиль был стабильным
+        "nologo": "true"
+    }
+    # Собираем URL вручную, чтобы надёжно передать параметры
+    param_str = "&".join(f"{k}={v}" for k, v in params.items())
+
+
     # Формируем полный URL: базовый адрес + закодированный промпт + параметры
     # model=flux — модель, которая лучше рисует схемы и текст
     # nologo=true — убирает водяной знак Pollinations (если есть)
-    url = f"{IMAGE_GEN_URL}{encoded_prompt}?model=flux&nologo=true"
+    url = f"{IMAGE_GEN_URL}{encoded_prompt}?{param_str}"
     logger.debug(f"URL генерации: {url}")
 
     try:
         # Выполняем GET-запрос и сразу получаем бинарные данные картинки
-        response = requests.get(url, timeout=30)  # 30 секунд — максимальное время ожидания
+        response = requests.get(url, timeout=60)  # 30 секунд — максимальное время ожидания
         response.raise_for_status()              # если сервер вернул ошибку (4xx,5xx), вылетит исключение
         logger.info(f"Изображение успешно загружено, размер: {len(response.content)} байт")
         return response.content  # возвращаем байты изображения

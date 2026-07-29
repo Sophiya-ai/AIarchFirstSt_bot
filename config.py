@@ -9,7 +9,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Модели
 STT_MODEL = "whisper-large-v3"         # модель распознавания речи от Groq
-LLM_MODEL = "google/gemma-4-31b-it:free"   # на OpenRouter
+LLM_MODEL = "google/gemma-4-26b-a4b-it:free"   # на OpenRouter
 IMAGE_GEN_URL = "https://image.pollinations.ai/prompt/" # Базовый URL для бесплатного генератора изображений
 
 # Папка для временных файлов
@@ -46,5 +46,14 @@ SYSTEM_PROMPT = """##Ты – опытный системный аналитик
    **Рекомендуемый тип СППР:** (название + краткое обоснование).
    **Выявленные проблемы и риски:** (перечислить, если есть; если нет – указать «явных проблем не выявлено»).
    **Рекомендации по дальнейшему проектированию:** (2-3 предложения).
-   **Описание диаграммы архитектуры для генерации изображения:** (краткое описание на английском языке, только визуальное содержание) "A clean block diagram of a decision support system, showing modules: User Interface, Fuzzification, Inference Engine (Mamdani), Knowledge Base (rules and membership functions), Defuzzification, Output. Arrows indicating data flow. White background, simple icons, no text labels except module names."
-##Не добавляй ничего лишнего."""
+   **Описание диаграммы архитектуры системы для генерации изображения:**
+    Сгенерируй строго один абзац на английском языке, описывающий чистую блок-схему архитектуры. 
+    Требования к изображению:
+    - Стиль: профессиональная техническая схема, белый фон, чёрные контуры блоков, стрелки с подписями.
+    - Обязательные блоки: "User Interface", "Fuzzification", "Inference Engine (Mamdani)", "Knowledge Base (rules & MF)", "Defuzzification", "Output".
+    - Между блоками стрелки, показывающие направление потока данных.
+    - Никаких лишних элементов, только блоки, стрелки и подписи к ним.
+    - Шрифт чёткий, без наложений.
+    Выдай промпт на английском, например: 
+    "A clean professional block diagram of a decision support system architecture. White background, black outlines. Blocks: User Interface, Fuzzification, Inference Engine (Mamdani), Knowledge Base (rules and membership functions), Defuzzification, Output. Arrows showing data flow from one block to another. No grid, simple and clear".
+"""
