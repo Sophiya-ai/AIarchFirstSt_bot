@@ -62,30 +62,39 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
             full_response = response.choices[0].message.content
             logger.info(f"Ответ от OpenRouter получен, длина: {len(full_response)} символов")
 
-            # Теперь отделим текст отчёта от описания картинки.
-            # В ответе есть специальная секция «Описание диаграммы архитектуры...».
-            # Мы вырежем её, чтобы не показывать пользователю, а использовать отдельно.
-            lines = full_response.split("\n")
-            text_report = []
-            diagram_desc = ""
-            capture = False  # флаг, который говорит, что мы сейчас читаем описание диаграммы
-            for line in lines:
-                if line.strip().startswith("**Описание диаграммы архитектуры"):
-                    capture = True # началась секция с описанием
-                    continue       # эту строку (заголовок) пропускаем
-                if capture:
-                    diagram_desc += line.strip() + " " # собираем все строки описания в одну
-                else:
-                    text_report.append(line)
+            # Теперь отделим текст отчёта от описания картинки и кода Mermaid.
+            # В ответе есть специальные секции для них.
+            # Мы вырежем их, чтобы не показывать пользователю, а использовать отдельно.
+            text_report = full_response
+            logo_prompt = ""
+            mermaid_code = ""
 
-            # Убираем возможные остатки маркера из текста (если он оказался не на отдельной строке)
-            report = "\n".join(text_report).replace("**Описание диаграммы архитектуры для генерации изображения:**", "").strip()
-            diagram_desc = diagram_desc.strip()
-            logger.debug(f"Извлечено описание диаграммы: {diagram_desc[:80]}...")
+            # Разбиваем по маркеру логотипа
+            logo_marker = "**Описание логотипа для системы:**"
+            mermaid_marker = "**Диаграмма архитектуры в формате Mermaid:**"
+
+            if logo_marker in text_report:
+                parts = text_report.split(logo_marker, 1)
+                text_report = parts[0].strip()
+                rest = parts[1]
+                if mermaid_marker in rest:
+                    logo_part, mermaid_part = rest.split(mermaid_marker, 1)
+                    logo_prompt = logo_part.strip()
+                    mermaid_code = mermaid_part.strip()
+                else:
+                    logo_prompt = rest.strip()
+            elif mermaid_marker in text_report:
+                parts = text_report.split(mermaid_marker, 1)
+                text_report = parts[0].strip()
+                mermaid_code = parts[1].strip()
+
+            logger.debug(f"Логотип: {logo_prompt[:80] if logo_prompt else 'нет'}")
+            logger.debug(f"Mermaid: {mermaid_code[:80] if mermaid_code else 'нет'}")
 
             return {
-                "report": report,                           # чистый текст для пользователя
-                "diagram_prompt": diagram_desc.strip()      # промпт для генератора картинок
+                "report": text_report,
+                "logo_prompt": logo_prompt,
+                "mermaid_code": mermaid_code
             }
 
         except RateLimitError as e:

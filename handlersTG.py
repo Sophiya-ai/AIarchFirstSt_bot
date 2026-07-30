@@ -13,7 +13,8 @@ from telegram.ext import ContextTypes            # Контекст для хр�
 # Импортируем функции из наших сервисов
 from services.stt import transcribe_audio        # Распознавание речи
 from services.analyzer import analyze_brief      # Анализ брифа (текст + фото)
-from services.image_gen import generate_architecture_image  # Генерация картинки
+from services.kroki import generate_diagram  # Генерация диаграммы
+from services.image_gen import generate_architecture_image # Генерация логотипа
 import utils                                     # Вспомогательные функции (скачивание, кодирование и т.д.)
 from logger import LOGGER_NAME
 
@@ -217,49 +218,66 @@ async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,
         logger.info("Анализ завершён успешно")
 
         # ----------------------------------------------
-        # Шаг 3: Генерация изображения архитектуры
+        # Шаг 3: Генерация логотипа (Pollinations)
         # ----------------------------------------------
-        img_bytes = None
-        # Проверяем, вернула ли модель описание диаграммы (prompt)
-        if analysis["diagram_prompt"]:
-            logger.debug(f"Этап 3: генерация диаграммы, промпт: {analysis['diagram_prompt'][:80]}...")
+        logo_bytes = None
+        # Проверяем, вернула ли модель описание
+        if analysis['logo_prompt']:
+            logger.debug(f"Этап 3: генерация логотипа (Pollinations), промпт: {analysis['logo_prompt'][:80]}...")
             try:
-                await processing_msg.edit_text("🖼️ Генерирую диаграмму архитектуры ...")
+                await processing_msg.edit_text("🎨 Создаю логотип системы...")
                 # Генерируем изображение через Pollinations.ai
-                img_bytes = generate_architecture_image(analysis["diagram_prompt"])
-                logger.info("Изображение архитектуры успешно сгенерировано")
+                logo_bytes = generate_architecture_image(analysis["logo_prompt"])
+                logger.info("Логотип успешно создан")
             except Exception as e:
                 # Если генерация не удалась, предупредим, но анализ всё равно отправим
                 # Ошибки записываются с трассировкой (exc_info=True),
                 # что позволяет моментально понять, что сломалось
-                logger.error(f"Ошибка генерации изображения: {str(e)}", exc_info=True)
-                await message.reply_text(f"⚠️ Не удалось сгенерировать изображение: {e}")
+                logger.error(f"Ошибка генерации логотипа: {str(e)}", exc_info=True)
+                await message.reply_text(f"⚠️ Не удалось создать логотип: {e}")
         else:
             logger.warning("Модель не вернула описание диаграммы, пропускаем генерацию")
 
         # ----------------------------------------------
-        # Шаг 4: Отправка результатов пользователю
+        # Шаг 4: Генерация архитектурной диаграммы (Kroki)
+        # ----------------------------------------------
+        diagram_bytes = None
+        if analysis.get("mermaid_code"):
+            try:
+                await processing_msg.edit_text("📐 Рисую архитектурную диаграмму...")
+                diagram_bytes = generate_diagram(analysis["mermaid_code"])
+                logger.info("Диаграмма успешно создана")
+            except Exception as e:
+                logger.error(f"Ошибка генерации диаграммы: {str(e)}", exc_info=True)
+                await message.reply_text(f"⚠️ Не удалось создать диаграмму: {e}")
+
+        await processing_msg.delete() # Удаляем сообщение о ходе обработки
+
+        # ----------------------------------------------
+        # Шаг 5: Отправка результатов пользователю
         # ----------------------------------------------
         logger.debug("Этап 4: отправка результатов пользователю")
-        await processing_msg.delete()   # Удаляем сообщение о ходе обработки
 
         # Текстовый отчёт: обрезаем до безопасного лимита Telegram (4000 символов)
         report = analysis["report"]
         if len(report) > 4000:
             report = report[:4000] + "\n... (текст обрезан)"
-
-        # Отправляем текстовый отчёт
-        await message.reply_text(report)
+        await message.reply_text(report) # Отправляем текстовый отчёт
 
         # Если изображение сгенерировано, отправляем его как фото
-        if img_bytes:
+        if logo_bytes:
             # Сохраняем байты картинки в файл во временной папке
-            img_path = utils.save_response_image(img_bytes)
+            logo_path = utils.save_response_image(logo_bytes, "logo.png")
             # Открываем и отправляем
-            with open(img_path, "rb") as img:
-                await message.reply_photo(img, caption="Диаграмма архитектуры СППР")
+            with open(logo_path, "rb") as img:
+                await message.reply_photo(img, caption="Логотип системы")
+            logger.info(f"Логотип отправлен, временный файл: {logo_path}")
 
-            logger.info(f"Диаграмма отправлена, временный файл: {img_path}")
+        # Отправляем диаграмму, если есть
+        if diagram_bytes:
+            diagram_path = utils.save_response_image(diagram_bytes, "architecture.png")
+            with open(diagram_path, "rb") as img:
+                await message.reply_photo(img, caption="Диаграмма архитектуры СППР")
 
         logger.info("Анализ успешно завершён и отправлен")
 
