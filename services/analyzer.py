@@ -45,25 +45,30 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
             response = client.chat.completions.create(
                 model=LLM_MODEL,
                 messages=[
-                    # Системное сообщение задаёт поведение всей беседы
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    # Пользовательское сообщение содержит текст и картинку
                     {"role": "user", "content": [
-                        # Текстовая часть
                         {"type": "text", "text": brief_text},
-                        # Изображение в формате data URI (base64)
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
                     ]}
                 ],
                 extra_body={"reasoning": {"enabled": True}},
-                temperature=0.2, # низкая температура — ответ более предсказуемый и точный
-                max_tokens=2000  # ограничиваем длину ответа
+                temperature=0.2,
+                max_tokens=3000  # увеличенный лимит
             )
 
-            # Получаем текст ответа
+            # Проверяем, что API вернул непустой ответ
+            if not response.choices or not response.choices[0].message or not response.choices[0].message.content:
+                logger.warning(f"Пустой ответ от OpenRouter. Полный ответ: {response}")
+                if attempt < MAX_RETRIES:
+                    wait = RETRY_DELAY * attempt
+                    logger.info(f"Повторная попытка через {wait} секунд...")
+                    time.sleep(wait)
+                    continue  # переходим к следующей итерации цикла for
+                else:
+                    raise RuntimeError("API OpenRouter вернул пустой ответ после всех попыток.")
+
             full_response = response.choices[0].message.content
             logger.info(f"Ответ от OpenRouter получен, длина: {len(full_response)} символов")
-
 
             # Теперь отделим текст отчёта от описания картинки и кода Mermaid.
             # В ответе есть специальные секции для них.
