@@ -57,6 +57,6 @@ SYSTEM_PROMPT = """##Ты – опытный системный аналитик
       - Обязательные блоки: UserInterface, Fuzzification, InferenceEngine, KnowledgeBase, Defuzzification, Output.
       - Стрелки: от UserInterface к Fuzzification, от Fuzzification к InferenceEngine, от KnowledgeBase к InferenceEngine, от InferenceEngine к  Defuzzification, от Defuzzification к Output.
       - Не используй CSS-стили, только базовый синтаксис.
-      - Выдай ТОЛЬКО код Mermaid, начиная с "graph TD", без markdown-обрамления (без ```).
+      - Выдай ТОЛЬКО код Mermaid, начиная **строго** с "graph TD" без каких‑либо дополнительных заголовков, без markdown-обрамления (без ```).    
 ## Не добавляй ничего лишнего.
 """

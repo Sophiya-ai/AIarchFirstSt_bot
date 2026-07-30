@@ -3,6 +3,7 @@
 Использует OpenRouter для вызова модели Gemini Flash,
 которая умеет читать картинки и текст одновременно.
 """
+import re
 import time
 import logging
 from openai import OpenAI, RateLimitError
@@ -21,6 +22,7 @@ client = OpenAI(
 
 MAX_RETRIES = 3          # сколько раз пробовать при rate-limit
 RETRY_DELAY = 5          # начальная задержка в секундах (будет расти)
+
 
 def analyze_brief(brief_text: str, image_path: str) -> dict:
     """
@@ -62,31 +64,31 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
             full_response = response.choices[0].message.content
             logger.info(f"Ответ от OpenRouter получен, длина: {len(full_response)} символов")
 
+
             # Теперь отделим текст отчёта от описания картинки и кода Mermaid.
             # В ответе есть специальные секции для них.
             # Мы вырежем их, чтобы не показывать пользователю, а использовать отдельно.
-            text_report = full_response
-            logo_prompt = ""
-            mermaid_code = ""
+            # Ищем mermaid‑код: он начинается со слова "graph" и типа графа (TD, LR и т.д.)
+            mermaid_match = re.search(r'\b(graph\s+[A-Z]{2}[^\n]*)', full_response, re.IGNORECASE)
+            if mermaid_match:
+                # Берём всё, начиная с graph и до конца ответа (это код диаграммы)
+                mermaid_code = full_response[mermaid_match.start():].strip()
+                # Удаляем возможный остаток markdown-обёртки, если он есть
+                mermaid_code = mermaid_code.replace("```mermaid", "").replace("```", "").strip()
+                before_mermaid = full_response[:mermaid_match.start()].strip()
+            else:
+                mermaid_code = ""
+                before_mermaid = full_response
 
-            # Разбиваем по маркеру логотипа
+            # Теперь в before_mermaid ищем описание логотипа по маркеру
             logo_marker = "**Описание логотипа для системы:**"
-            mermaid_marker = "**Диаграмма архитектуры в формате Mermaid:**"
-
-            if logo_marker in text_report:
-                parts = text_report.split(logo_marker, 1)
+            if logo_marker in before_mermaid:
+                parts = before_mermaid.split(logo_marker, 1)
                 text_report = parts[0].strip()
-                rest = parts[1]
-                if mermaid_marker in rest:
-                    logo_part, mermaid_part = rest.split(mermaid_marker, 1)
-                    logo_prompt = logo_part.strip()
-                    mermaid_code = mermaid_part.strip()
-                else:
-                    logo_prompt = rest.strip()
-            elif mermaid_marker in text_report:
-                parts = text_report.split(mermaid_marker, 1)
-                text_report = parts[0].strip()
-                mermaid_code = parts[1].strip()
+                logo_prompt = parts[1].strip()
+            else:
+                text_report = before_mermaid
+                logo_prompt = ""
 
             logger.debug(f"Логотип: {logo_prompt[:80] if logo_prompt else 'нет'}")
             logger.debug(f"Mermaid: {mermaid_code[:80] if mermaid_code else 'нет'}")

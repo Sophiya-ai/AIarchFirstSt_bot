@@ -1,4 +1,5 @@
 import os
+import re
 import base64  # для кодирования картинок в текст (base64) при отправке модели
 import logging
 import asyncio

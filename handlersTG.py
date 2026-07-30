@@ -217,6 +217,10 @@ async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,
         analysis = analyze_brief(brief_text, photo_path)
         logger.info("Анализ завершён успешно")
 
+        logger.info(f"mermaid_code сырой: {analysis['mermaid_code']}")
+        if analysis['mermaid_code']:
+            logger.info(f"Первые 200 символов кода: {analysis['mermaid_code'][:200]}")
+
         # ----------------------------------------------
         # Шаг 3: Генерация логотипа (Pollinations)
         # ----------------------------------------------
