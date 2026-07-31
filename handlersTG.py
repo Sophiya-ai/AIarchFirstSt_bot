@@ -7,6 +7,7 @@
 """
 import os
 import logging
+import asyncio
 from telegram import Update                      # Объект с информацией о событии
 from telegram.ext import ContextTypes            # Контекст для хранения данных между вызовами
 
@@ -192,6 +193,17 @@ async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,
     # Отправляем сообщение «статус обработки», которое будем редактировать на каждом шаге
     processing_msg = await message.reply_text("⏳ Начинаю анализ...")
 
+    # --- Таймер долгого ожидания ---
+    async def notify_long_wait():
+        await asyncio.sleep(15)
+        try:
+            await processing_msg.edit_text("🕐 Всё ещё анализирую бриф и схему... Пожалуйста, подождите.")
+        except Exception:
+            pass  # если сообщение уже удалено или изменено, игнорируем
+
+    long_wait_task = asyncio.create_task(notify_long_wait())
+    # -------------------------------
+
     try:
         # ----------------------------------------------
         # Шаг 1: Распознавание речи (Audio -> Text)
@@ -220,6 +232,14 @@ async def run_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE,
         logger.info(f"mermaid_code сырой: {analysis['mermaid_code']}")
         if analysis['mermaid_code']:
             logger.info(f"Первые 200 символов кода: {analysis['mermaid_code'][:200]}")
+
+        # После завершения анализа отменяем таймер
+        long_wait_task.cancel()
+        try:
+            await long_wait_task
+        except asyncio.CancelledError:
+            pass
+
 
         # ----------------------------------------------
         # Шаг 3: Генерация логотипа (Pollinations)

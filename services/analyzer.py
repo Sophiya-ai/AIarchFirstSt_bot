@@ -24,6 +24,25 @@ MAX_RETRIES = 3          # сколько раз пробовать при rate-
 RETRY_DELAY = 5          # начальная задержка в секундах (будет расти)
 
 
+def _trim_logo_prompt(prompt: str) -> str:
+    """Обрезает описание логотипа до первого законченного предложения (точка, восклицательный или вопросительный знак)
+    и ограничивает длину до 200 символов, чтобы не загрязнять URL Pollinations."""
+    if not prompt:
+        return ""
+    # Ищем конец первого предложения
+    match = re.search(r'[.!?]', prompt)
+    if match:
+        end_pos = match.end()
+        trimmed = prompt[:end_pos].strip()
+    else:
+        trimmed = prompt.strip()
+    # Ограничиваем длину
+    if len(trimmed) > 200:
+        # Обрезаем до последнего пробела перед 200 символами, чтобы не разорвать слово
+        trimmed = trimmed[:200].rsplit(' ', 1)[0] + "."
+    return trimmed
+
+
 def analyze_brief(brief_text: str, image_path: str) -> dict:
     """
         Главная функция анализа.
@@ -91,6 +110,7 @@ def analyze_brief(brief_text: str, image_path: str) -> dict:
                 parts = before_mermaid.split(logo_marker, 1)
                 text_report = parts[0].strip()
                 logo_prompt = parts[1].strip()
+                logo_prompt = _trim_logo_prompt(logo_prompt)
             else:
                 text_report = before_mermaid
                 logo_prompt = ""
